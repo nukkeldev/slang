@@ -20,6 +20,10 @@
             .url = "git+https://github.com/allyourcodebase/lz4.git?ref=1.10.0-5#873969ee73aecb3c35203feaf0b5727b9d02b864",
             .hash = "lz4-1.10.0-5-ewyzw7YNAADOUkQ7M9fjW005oGzxt9b6m0uPd_kQC48z",
         },
+        .@"spirv-headers" = .{
+            .url = "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/heads/main.zip",
+            .hash = "N-V-__8AAGiJOgBosX3-HhiyznvMMbKS6wQY6CNfXswKaYpF",
+        },
     },
     .paths = .{
         "LICENSE",

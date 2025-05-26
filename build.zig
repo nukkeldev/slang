@@ -1,10 +1,63 @@
 const std = @import("std");
 
-// TODO: zig fetch does not support submodules so we need to provide our own linking to dependencies.
+var upstream: *std.Build.Dependency = undefined;
+
+const TargetOptions = struct {
+    path: []const u8,
+    include_directories: []const []const u8,
+
+    file_specific_flags: []const struct {
+        file: []const u8,
+        flags: []const []const u8,
+    } = &.{},
+
+    linkage: std.builtin.LinkMode = .static,
+};
+
+fn addTarget(b: *std.Build, mod: *std.Build.Module, name: []const u8, options: TargetOptions) !*std.Build.Step.Compile {
+    const root = upstream.path(options.path);
+
+    // Library
+    const lib = b.addLibrary(.{
+        .name = name,
+        .root_module = mod,
+        .linkage = options.linkage,
+    });
+
+    // Add C++ Sources
+    {
+        var file_specific_flags = std.StringHashMap([]const []const u8).init(b.allocator);
+        for (options.file_specific_flags) |fsf| {
+            try file_specific_flags.put(fsf.file, fsf.flags);
+        }
+        defer file_specific_flags.deinit();
+
+        const dir = try upstream.path(options.path).getPath3(b, null).openDir(".", .{ .iterate = true });
+        var iter = dir.iterate();
+
+        while (try iter.next()) |entry| {
+            if (entry.kind != .file or !std.mem.endsWith(u8, entry.name, ".cpp")) continue;
+            lib.addCSourceFile(.{
+                .file = root.path(b, entry.name),
+                .flags = file_specific_flags.get(entry.name) orelse &.{},
+            });
+        }
+
+        // TODO: Add platform-specific dependencies for i.e. `windows/` sub-folder.
+    }
+
+    // Include Directories
+    lib.addIncludePath(root);
+    for (options.include_directories) |dir| lib.addIncludePath(upstream.path(dir));
+
+    // TODO: installHeadersDirectory?
+
+    return lib;
+}
 
 pub fn build(b: *std.Build) !void {
     // Upstream
-    const upstream = b.dependency("slang", .{});
+    upstream = b.dependency("slang", .{});
 
     // Options
     const target = b.standardTargetOptions(.{});
@@ -17,6 +70,7 @@ pub fn build(b: *std.Build) !void {
     // -- Raw
     const miniz = b.dependency("miniz", .{});
     const unordered_dense = b.dependency("unordered_dense", .{});
+    const spriv_headers = b.dependency("spirv-headers", .{});
 
     // -- Wrapped
     const lz4 = b.dependency("lz4", .{
@@ -34,58 +88,48 @@ pub fn build(b: *std.Build) !void {
         // .sanitize_c = null, // ?
     });
 
-    // Add external dependencies to module.
+    // External Dependency Installation
     // -- miniz
     mod_slang.addIncludePath(miniz.path(""));
     mod_slang.addCSourceFile(.{ .file = miniz.path("miniz.c") });
     // -- ankerl/unordered_dense
     mod_slang.addIncludePath(unordered_dense.path("include"));
+    // -- spirv-headers
+    mod_slang.addIncludePath(spriv_headers.path("include"));
     // -- lz4
     mod_slang.linkLibrary(lz4.artifact("lz4"));
 
-    // Library
-    const lib_slang = b.addLibrary(.{
-        .name = "slang",
-        .root_module = mod_slang,
+    // Compiler Definitions
+    switch (linkage) {
+        .dynamic => {
+            mod_slang.addCMacro("SLANG_DYNAMIC", "");
+            mod_slang.addCMacro("SLANG_DYNAMIC_EXPORT", "");
+        },
+        .static => {
+            mod_slang.addCMacro("SLANG_STATIC", "");
+        },
+    }
+
+    // Libraries
+    // const lib = b.addLibrary(.{
+    //     .name = "slang",
+    //     .root_module = mod_slang,
+    //     .linkage = linkage,
+    // });
+    // b.installArtifact(lib);
+
+    const lib_core = try addTarget(b, mod_slang, "core", .{
+        .path = "source/core",
+        .include_directories = &.{ "source", "include" },
         .linkage = linkage,
     });
-    b.installArtifact(lib_slang);
+    b.installArtifact(lib_core);
 
-    // slang/core
-
-    const lib_slang_core = b.addLibrary(.{
-        .name = "core",
-        .root_module = mod_slang,
-        .linkage = .static,
+    const lib_compiler_core = try addTarget(b, mod_slang, "compiler-core", .{
+        .path = "source/compiler-core",
+        .include_directories = &.{ "source", "include" },
+        .file_specific_flags = &.{.{ .file = "slang-dxc-compiler.cpp", .flags = &.{"-fms-extensions"} }},
+        .linkage = linkage,
     });
-
-    // Open the source directory and collect all .cpp files' relative paths.
-    const lib_slang_core_sources = b: {
-        var sources = std.ArrayList([]const u8).init(b.allocator);
-
-        const dir = try upstream.path("source/core").getPath3(b, null).openDir(".", .{ .iterate = true });
-        var iter = dir.iterate();
-
-        while (try iter.next()) |entry| {
-            if (entry.kind != .file or !std.mem.endsWith(u8, entry.name, ".cpp")) continue;
-            try sources.append(try b.allocator.dupe(u8, entry.name));
-        }
-
-        break :b try sources.toOwnedSlice();
-    };
-
-    // Add the sources to our library.
-    lib_slang_core.addCSourceFiles(.{
-        .root = upstream.path("source/core"),
-        .files = lib_slang_core_sources,
-    });
-
-    // Set the include paths.
-    lib_slang_core.addIncludePath(upstream.path("source"));
-    lib_slang_core.addIncludePath(upstream.path("include"));
-    lib_slang_core.addIncludePath(upstream.path("source/core"));
-
-    // Add our external dependencies.
-
-    // TODO: installHeadersDirectory?
+    b.installArtifact(lib_compiler_core);
 }
