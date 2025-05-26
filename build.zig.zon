@@ -5,11 +5,11 @@
     .minimum_zig_version = "0.14.1",
     .dependencies = .{
         .slang = .{
-            .url = "https://github.com/shader-slang/slang/archive/refs/tags/v2025.9.2.tar.gz",
+            .url = "git+https://github.com/shader-slang/slang?ref=v2025.9.2#27c6e9b01f7386263bde90e16812be46327015c2",
             .hash = "N-V-__8AAHt8yAE3R11FeTvG9rc1o1zfTf5cjYvEi7n8X1II",
         },
         .unordered_dense = .{
-            .url = "https://github.com/martinus/unordered_dense/archive/refs/tags/v4.5.0.zip",
+            .url = "git+https://github.com/martinus/unordered_dense?ref=v4.5.0#73f3cbb237e84d483afafc743f1f14ec53e12314",
             .hash = "N-V-__8AAFdJPQAl6CxKMHf2wXdxBdN-vipngsh6Tg1JLY1I",
         },
         .miniz = .{
@@ -21,8 +21,12 @@
             .hash = "lz4-1.10.0-5-ewyzw7YNAADOUkQ7M9fjW005oGzxt9b6m0uPd_kQC48z",
         },
         .@"spirv-headers" = .{
-            .url = "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/heads/main.zip",
+            .url = "git+https://github.com/KhronosGroup/SPIRV-Headers#c9aad99f9276817f18f72a4696239237c83cb775",
             .hash = "N-V-__8AAGiJOgBosX3-HhiyznvMMbKS6wQY6CNfXswKaYpF",
+        },
+        .lua = .{
+            .url = "../lua",
+            .hash = "lua-5.4.7-zqrcyg4nAAAXz5-STphXoUzXScimXSfZ6kwwt7xsdB2v",
         },
     },
     .paths = .{

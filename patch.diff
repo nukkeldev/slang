@@ -1,0 +1,41 @@
+--- a/tools/slang-fiddle/slang-fiddle-lua.cpp
++++ b/tools/slang-fiddle/slang-fiddle-lua.cpp
+@@ -1,5 +1,4 @@
+ // slang-fiddle-lua.cpp
+ 
+ 
+-#define MAKE_LIB 1
+-#include "onelua.c"
++#include <lua.hpp>
+--- a/tools/slang-fiddle/slang-fiddle-script.cpp
++++ b/tools/slang-fiddle/slang-fiddle-script.cpp
+@@ -1,9 +1,7 @@
+ // slang-fiddle-script.cpp
+ #include "slang-fiddle-script.h"
+ 
+-#include "../external/lua/lapi.h"
+-#include "../external/lua/lauxlib.h"
+-#include "../external/lua/lualib.h"
++#include <lua.hpp>
+ 
+ namespace fiddle
+ {
+--- a/tools/slang-fiddle/slang-fiddle-script.h
++++ b/tools/slang-fiddle/slang-fiddle-script.h
+@@ -1,14 +1,14 @@
+ // slang-fiddle-script.h
+ #pragma once
+ 
+-#include "../external/lua/lapi.h"
+-#include "../external/lua/lauxlib.h"
+ #include "compiler-core/slang-source-loc.h"
+ #include "core/slang-list.h"
+ #include "core/slang-string.h"
+ #include "slang-fiddle-diagnostics.h"
+ #include "slang-fiddle-scrape.h"
++
++#include <lua.hpp>
+
+ namespace fiddle
+ {
+ using namespace Slang;

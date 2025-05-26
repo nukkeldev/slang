@@ -1,15 +1,18 @@
 const std = @import("std");
-const builtin = @import("builtin");
 
 var target: std.Build.ResolvedTarget = undefined;
 var optimize: std.builtin.OptimizeMode = undefined;
-var upstream: *std.Build.Dependency = undefined;
+var immutable_upstream: std.Build.LazyPath = undefined;
+var upstream: std.Build.LazyPath = undefined;
+
+var lib_core: *std.Build.Step.Compile = undefined;
+var lib_compiler_core: *std.Build.Step.Compile = undefined;
 
 // Build
 
 pub fn build(b: *std.Build) !void {
-    // Upstream
-    upstream = b.dependency("slang", .{});
+    // Copy upstream to local cache.
+    try configure_upstream(b);
 
     // Options
     target = b.standardTargetOptions(.{});
@@ -19,7 +22,7 @@ pub fn build(b: *std.Build) !void {
     // TODO: Define the rest of the options.
 
     // Libraries
-    const lib_core = try addTarget(b, "core", .{
+    lib_core = try addTarget(b, "core", .{
         .type = .library,
         .path = "source/core",
         .external_dependencies = &.{ .miniz, .unordered_dense, .lz4 },
@@ -28,7 +31,7 @@ pub fn build(b: *std.Build) !void {
     });
     b.installArtifact(lib_core);
 
-    const lib_compiler_core = try addTarget(b, "compiler-core", .{
+    lib_compiler_core = try addTarget(b, "compiler-core", .{
         .type = .library,
         .path = "source/compiler-core",
         .link_with = &.{lib_core}, // TODO: Propigate
@@ -39,53 +42,17 @@ pub fn build(b: *std.Build) !void {
     });
     b.installArtifact(lib_compiler_core);
 
-    // const prelude = try addTarget(b, mod, "prelude", .{
-    //     .type = .library,
-    //     .path = "prelude",
-    //     .include_directories = &.{ "source", "include" },
-    // });
-
-    // Tools
-    // -- slang-capability-generator
-    const exe_capability_generator = try addTarget(b, "slang-capability-generator", .{
-        .type = .executable,
-        .path = "tools/slang-capability-generator",
-        .include_directories = &.{"include"},
-        .link_with = &.{lib_compiler_core},
+    const prelude = try addTarget(b, "prelude", .{
+        .type = .library,
+        .path = "prelude",
         .external_dependencies = &.{.unordered_dense},
-        .linkage = .dynamic,
-    });
-    b.installArtifact(exe_capability_generator);
-
-    const run_capability_generator = b.addRunArtifact(exe_capability_generator);
-    run_capability_generator.cwd = upstream.path("");
-    run_capability_generator.addArgs(&.{
-        "source/slang/slang-capabilities.capdef",
-        "--target-directory",
-        "source/slang/capability",
-        "--doc",
-        "docs/user-guide/a3-02-reference-capability-atoms.md",
-    });
-    // -- slang-embed
-    const exe_embed = try addTarget(b, "slang-embed", .{
-        .type = .executable,
-        .path = "tools/slang-embed",
         .include_directories = &.{"include"},
-        .link_with = &.{lib_core},
-        .external_dependencies = &.{.unordered_dense},
-        .linkage = .dynamic,
+        .linkage = linkage,
     });
-    b.installArtifact(exe_embed);
+    prelude.step.dependOn(try embed_prelude(b));
+    b.installArtifact(prelude);
 
-    const run_embed = b.addRunArtifact(exe_capability_generator);
-    run_embed.cwd = upstream.path("");
-    run_embed.addArgs(&.{
-        "source/slang/slang-capabilities.capdef",
-        "--target-directory",
-        "source/slang/capability",
-        "--doc",
-        "docs/user-guide/a3-02-reference-capability-atoms.md",
-    });
+    _ = try fiddle(b);
 }
 
 // Targets
@@ -95,7 +62,7 @@ const TargetOptions = struct {
 
     path: []const u8,
     link_with: []const *std.Build.Step.Compile = &.{},
-    external_dependencies: []const enum { lz4, miniz, @"spirv-headers", unordered_dense } = &.{},
+    external_dependencies: []const enum { lz4, miniz, @"spirv-headers", unordered_dense, lua } = &.{},
     include_directories: []const []const u8 = &.{},
 
     file_specific_flags: []const struct {
@@ -107,7 +74,7 @@ const TargetOptions = struct {
 };
 
 fn addTarget(b: *std.Build, name: []const u8, options: TargetOptions) !*std.Build.Step.Compile {
-    const root = upstream.path(options.path);
+    const root = upstream.path(b, options.path);
 
     // Module
     const mod = b.createModule(.{
@@ -128,13 +95,13 @@ fn addTarget(b: *std.Build, name: []const u8, options: TargetOptions) !*std.Buil
         }
         defer file_specific_flags.deinit();
 
-        const allowed_dirs: []const []const u8 = &[_][]const u8{""} ++ switch (builtin.os.tag) {
-            .windows => &[_][]const u8{"windows"},
-            .linux => &[_][]const u8{"unix"},
-            else => &[_][]const u8{},
+        const allowed_dirs: []const []const u8 = switch (target.result.os.tag) {
+            .windows => &[_][]const u8{ "", "windows" },
+            .linux => &[_][]const u8{ "", "unix" },
+            else => &[_][]const u8{""},
         };
 
-        const dir = try upstream.path(options.path).getPath3(b, null).openDir(".", .{ .iterate = true });
+        const dir = try immutable_upstream.path(b, options.path).getPath3(b, null).openDir(".", .{ .iterate = true });
         var iter = try dir.walk(b.allocator);
         defer iter.deinit();
 
@@ -159,7 +126,7 @@ fn addTarget(b: *std.Build, name: []const u8, options: TargetOptions) !*std.Buil
 
     // Include Directories
     mod.addIncludePath(root);
-    for (options.include_directories) |dir| mod.addIncludePath(upstream.path(dir));
+    for (options.include_directories) |dir| mod.addIncludePath(upstream.path(b, dir));
 
     // Compiler Definitions
     switch (options.linkage) {
@@ -178,6 +145,7 @@ fn addTarget(b: *std.Build, name: []const u8, options: TargetOptions) !*std.Buil
         .unordered_dense => unordered_dense(b, mod),
         .@"spirv-headers" => spriv_headers(b, mod),
         .lz4 => lz4(b, mod),
+        .lua => lua(b, mod),
     };
 
     // TODO: installHeadersDirectory?
@@ -194,6 +162,106 @@ fn addTarget(b: *std.Build, name: []const u8, options: TargetOptions) !*std.Buil
             .linkage = options.linkage,
         }),
     };
+}
+
+// Upstream
+
+fn configure_upstream(b: *std.Build) !void {
+    // Copy the upstream to the local zig cache.
+
+    immutable_upstream = b.dependency("slang", .{}).path("");
+    const copy_upstream = b.addWriteFiles();
+
+    _ = copy_upstream.addCopyDirectory(immutable_upstream, "", .{});
+
+    upstream = copy_upstream.getDirectory();
+
+    // Patch the source files to remove out-of-source relative includes.
+
+    const patch_local_upstream = b.addSystemCommand(&.{"bash"});
+    patch_local_upstream.addFileArg(b.path("apply_patch"));
+    patch_local_upstream.addFileArg(b.path("patch.diff"));
+    patch_local_upstream.setCwd(upstream);
+
+    patch_local_upstream.step.dependOn(&copy_upstream.step);
+
+    b.getInstallStep().dependOn(&patch_local_upstream.step);
+}
+
+// Tools
+
+fn generate_capabilities(b: *std.Build) !*std.Build.Step {
+    const exe_capability_generator = try addTarget(b, "slang-capability-generator", .{
+        .type = .executable,
+        .path = "tools/slang-capability-generator",
+        .include_directories = &.{"include"},
+        .link_with = &.{lib_compiler_core},
+        .external_dependencies = &.{.unordered_dense},
+        .linkage = .dynamic,
+    });
+    b.installArtifact(exe_capability_generator);
+
+    const run_capability_generator = b.addRunArtifact(exe_capability_generator);
+    run_capability_generator.cwd = upstream.path("");
+    run_capability_generator.addArgs(&.{
+        "source/slang/slang-capabilities.capdef",
+        "--target-directory",
+        "source/slang/capability",
+        "--doc",
+        "docs/user-guide/a3-02-reference-capability-atoms.md",
+    });
+
+    return run_capability_generator;
+}
+
+fn embed_prelude(b: *std.Build) !*std.Build.Step {
+    const exe_embed = try addTarget(b, "slang-embed", .{
+        .type = .executable,
+        .path = "tools/slang-embed",
+        .include_directories = &.{"include"},
+        .link_with = &.{lib_core},
+        .external_dependencies = &.{.unordered_dense},
+        .linkage = .dynamic,
+    });
+    b.installArtifact(exe_embed);
+
+    var run_embed = try b.allocator.create(std.Build.Step);
+    run_embed.* = std.Build.Step.init(.{
+        .name = "run-embed",
+        .id = .custom,
+        .owner = b,
+    });
+
+    const files = &.{
+        "slang-cpp-host-prelude.h",
+        "slang-cpp-prelude.h",
+        "slang-cuda-prelude.h",
+        "slang-hlsl-prelude.h",
+        "slang-torch-prelude.h",
+    };
+
+    inline for (files) |file| {
+        const run = b.addRunArtifact(exe_embed);
+        run.cwd = upstream.path(b, "prelude");
+        run.addArgs(&.{ file, file ++ ".cpp" });
+        run_embed.dependOn(&run.step);
+    }
+
+    return run_embed;
+}
+
+fn fiddle(b: *std.Build) !*std.Build.Step {
+    const exe_fiddle = try addTarget(b, "slang-fiddle", .{
+        .type = .executable,
+        .path = "tools/slang-fiddle",
+        .include_directories = &.{ "source", "include" },
+        .link_with = &.{lib_compiler_core},
+        .external_dependencies = &.{ .unordered_dense, .lua },
+        .linkage = .dynamic,
+    });
+    b.installArtifact(exe_fiddle);
+
+    return &exe_fiddle.step;
 }
 
 // External Dependencies
@@ -224,4 +292,13 @@ fn lz4(b: *std.Build, mod: *std.Build.Module) void {
     });
 
     mod.linkLibrary(dep.artifact("lz4"));
+}
+
+fn lua(b: *std.Build, mod: *std.Build.Module) void {
+    const dep = b.dependency("lua", .{
+        .target = target,
+        .release = optimize != .Debug,
+    });
+
+    mod.linkLibrary(dep.artifact(if (target.result.os.tag == .windows) "lua54" else "lua"));
 }
