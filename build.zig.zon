@@ -25,8 +25,8 @@
             .hash = "N-V-__8AAGiJOgBosX3-HhiyznvMMbKS6wQY6CNfXswKaYpF",
         },
         .lua = .{
-            .url = "../lua",
-            .hash = "lua-5.4.7-zqrcyg4nAAAXz5-STphXoUzXScimXSfZ6kwwt7xsdB2v",
+            .url = "git+https://github.com/allyourcodebase/lua#5a5a4135cbb8991f27c01bce341fd93134dbecd1",
+            .hash = "lua-5.4.7-zqrcyuUjAAA4YBuZ47elrKT7DSeNx9c3K9XE2YlCoiSz",
         },
     },
     .paths = .{
