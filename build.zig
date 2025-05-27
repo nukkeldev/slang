@@ -29,6 +29,25 @@ pub fn build(b: *std.Build) void {
     copyAndPatchUpstream(b) catch @panic("failed to copy upstream");
     addTargets(b) catch @panic("failed to add targets");
 
+    { // unpack step
+        const pristine = b.addInstallDirectory(.{
+            .install_dir = .{ .custom = "source" },
+            .install_subdir = "pristine",
+            .source_dir = immutable_upstream,
+        });
+        const built = b.addInstallDirectory(.{
+            .install_dir = .{ .custom = "source" },
+            .install_subdir = "built",
+            .source_dir = upstream,
+        });
+
+        const unpack = b.step("unpack-source", "installs slang's source into zig-out");
+        unpack.dependOn(&pristine.step);
+        unpack.dependOn(&built.step);
+
+        b.getInstallStep().dependOn(unpack);
+    }
+
     dbg("created build", .{});
 }
 
@@ -93,6 +112,7 @@ const AddTargetOptions = struct {
     link_with: []const *Step.Compile = &.{},
     external_dependencies: []const enum { lz4, miniz, @"spirv-headers", unordered_dense, lua } = &.{},
     include_directories: []const []const u8 = &.{},
+    generated_source_files: []const []const u8 = &.{},
 
     config_headers: []const []const u8 = &.{},
 
@@ -104,7 +124,7 @@ const AddTargetOptions = struct {
 
     linkage: std.builtin.LinkMode = .static,
 
-    pub fn getFlags(self: @This(), allocator: std.mem.Allocator, file: []const u8) []const []const u8 {
+    pub fn getFlags(self: @This(), allocator: std.mem.Allocator, file_opt: ?[]const u8) []const []const u8 {
         var flags = std.ArrayList([]const u8).init(allocator);
         flags.appendSlice(CompilationFlags.COMMON) catch @panic("OOM");
 
@@ -114,11 +134,11 @@ const AddTargetOptions = struct {
             else => {},
         }
 
-        for (self.file_specific_flags) |fsf| {
+        if (file_opt) |file| for (self.file_specific_flags) |fsf| {
             if (std.mem.eql(u8, fsf.file, file)) {
                 flags.appendSlice(fsf.flags) catch @panic("OOM");
             }
-        }
+        };
 
         return flags.toOwnedSlice() catch @panic("");
     }
@@ -191,6 +211,12 @@ fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions
         }
 
         dbg("\tfound {} .cpp files", .{mod.link_objects.items.len - _dbg_link_objects});
+
+        mod.addCSourceFiles(.{
+            .files = options.generated_source_files,
+            .root = root,
+            .flags = options.getFlags(b.allocator, null),
+        });
     }
 
     // Include Directories
@@ -277,6 +303,13 @@ fn addTargets(b: *std.Build) !void {
         .path = "prelude",
         .external_dependencies = &.{.unordered_dense},
         .include_directories = &.{"include"},
+        .generated_source_files = &.{
+            "slang-cpp-host-prelude.h.cpp",
+            "slang-cpp-prelude.h.cpp",
+            "slang-cuda-prelude.h.cpp",
+            "slang-hlsl-prelude.h.cpp",
+            "slang-torch-prelude.h.cpp",
+        },
         .linkage = linkage,
     });
     lib_prelude.step.dependOn(try runSlangEmbed(b));

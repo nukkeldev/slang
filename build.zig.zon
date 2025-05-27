@@ -1,12 +1,12 @@
 .{
     .name = .slang,
-    .version = "2025.9.2",
+    .version = "2025.10.0",
     .fingerprint = 0x681d367ce8d10bbd, // Changing this has security and trust implications.
     .minimum_zig_version = "0.14.1",
     .dependencies = .{
         .slang = .{
-            .url = "git+https://github.com/shader-slang/slang?ref=v2025.9.2#27c6e9b01f7386263bde90e16812be46327015c2",
-            .hash = "N-V-__8AAHt8yAE3R11FeTvG9rc1o1zfTf5cjYvEi7n8X1II",
+            .url = "git+https://github.com/shader-slang/slang?ref=v2025.10#914f8c4b283bd81f2ea3ef00b184ff63245c9278",
+            .hash = "N-V-__8AANf8yQEp5VHgkN6CK5MjlDPuNgxyc94vZQK3_Xq6",
         },
         .unordered_dense = .{
             .url = "git+https://github.com/martinus/unordered_dense?ref=v4.5.0#73f3cbb237e84d483afafc743f1f14ec53e12314",
