@@ -1,12 +1,13 @@
 const std = @import("std");
 
+const Options = @import("options.zig");
+
 const Step = std.Build.Step;
 const Arg = Step.Run.Arg;
 
-// Standard Build Options
+// Build Options
 
-var target: std.Build.ResolvedTarget = undefined;
-var optimize: std.builtin.OptimizeMode = undefined;
+var build_options: *Options = undefined;
 
 // Upstream Paths
 
@@ -20,82 +21,10 @@ var lib_compiler_core: *Step.Compile = undefined;
 var lib_prelude: *Step.Compile = undefined;
 var lib_slang: *Step.Compile = undefined;
 
-// Slang Build Options
-
-// Taken from https://github.com/shader-slang/slang/blob/master/docs/building.md#cmake-options.
-
-/// The project version, if not specified, from build.zig.zon
-var SLANG_VERSION: []const u8 = getVersion();
-/// TODO: Build slang with an embedded version of the core module
-var SLANG_EMBED_CORE_MODULE: bool = true;
-/// TODO: Embed the core module source in the binary
-var SLANG_EMBED_CORE_MODULE_SOURCE: bool = true;
-/// TODO: Enable generating DXIL using DXC
-var SLANG_ENABLE_DXIL: bool = true;
-/// TODO: Enable ASAN (address sanitizer)
-var SLANG_ENABLE_ASAN: bool = false;
-/// TODO: Enable full IR validation (SLOW!)
-var SLANG_ENABLE_FULL_IR_VALIDATION: bool = false;
-/// TODO: Enable IR BreakAlloc functionality for debugging
-var SLANG_ENABLE_IR_BREAK_ALLOC: bool = false;
-/// TODO: Enable gfx targets
-var SLANG_ENABLE_GFX: bool = true;
-/// TODO: Enable language server target
-var SLANG_ENABLE_SLANGD: bool = true;
-/// TODO: Enable standalone compiler target
-var SLANG_ENABLE_SLANGC: bool = true;
-/// TODO: Enable Slang interpreter target
-var SLANG_ENABLE_SLANGI: bool = true;
-/// TODO: Enable runtime target
-var SLANG_ENABLE_SLANGRT: bool = true;
-/// TODO: Enable glslang dependency and slang-glslang wrapper target
-var SLANG_ENABLE_SLANG_GLSLANG: bool = true;
-/// TODO: Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT
-var SLANG_ENABLE_TESTS: bool = true;
-/// TODO: Enable example targets, requires SLANG_ENABLE_GFX
-var SLANG_ENABLE_EXAMPLES: bool = true;
-/// TODO: How to build the slang library
-/// NOTE: This was changed from the original .dynamic default.
-var SLANG_LIB_TYPE: std.builtin.LinkMode = .static;
-/// TODO: Enable generating debug info for Release configs
-var SLANG_ENABLE_RELEASE_DEBUG_INFO: bool = true;
-/// TODO: Enable LTO for Release builds
-var SLANG_ENABLE_RELEASE_LTO: bool = true;
-/// TODO: Enable generating split debug info for Debug and RelWithDebInfo configs
-var SLANG_ENABLE_SPLIT_DEBUG_INFO: bool = true;
-/// TODO: How to set up llvm support
-var SLANG_SLANG_LLVM_FLAVOR: []const u8 = "FETCH_BINARY_IF_POSSIBLE";
-/// TODO: URL specifying the location of the slang-llvm prebuilt library
-var SLANG_SLANG_LLVM_BINARY_URL: []const u8 = undefined; // TODO: Depends on target system.
-/// TODO: Path to an installed generator target binaries for cross compilation
-var SLANG_GENERATORS_PATH: ?[]const u8 = null; // TODO: Remove this.
-
-// The following options relate to optional dependencies for additional backends and running additional tests.
-// Left unchanged they are auto detected, however they can be set to OFF to prevent their usage, or set to ON
-// to make it an error if they can't be found.
-
-/// Enable running tests with the CUDA backend, doesn't affect the targets Slang itself supports
-var SLANG_ENABLE_CUDA: ?bool = null;
-var CUDAToolkit_ROOT: ?[]const u8 = null;
-var CUDA_PATH: ?[]const u8 = null;
-/// Requires CUDA
-var SLANG_ENABLE_OPTIX: ?bool = null;
-var Optix_ROOT_DIR: ?[]const u8 = null;
-/// Only available for builds targeting Windows
-var SLANG_ENABLE_NVAPI: ?bool = null;
-var NVAPI_ROOT_DIR: ?[]const u8 = null;
-/// Enable Aftermath in GFX, and add aftermath crash example to project
-var SLANG_ENABLE_AFTERMATH: ?bool = null;
-var Aftermath_ROOT_DIR: ?[]const u8 = null;
-var SLANG_ENABLE_XLIB: ?bool = null;
-
-var _install_tools: bool = undefined;
-var _debug_build_script: bool = undefined;
-
 // Build
 
 pub fn build(b: *std.Build) void {
-    setOptions(b);
+    build_options = Options.init(b) catch @panic("OOM");
 
     dbg("creating build", .{});
 
@@ -122,31 +51,6 @@ pub fn build(b: *std.Build) void {
     }
 
     dbg("created build", .{});
-}
-
-// Options
-
-fn setOptions(b: *std.Build) void {
-    std.log.info("build options", .{});
-
-    target = b.standardTargetOptions(.{});
-    std.log.info("\ttarget={}", .{target.result.os.tag});
-
-    optimize = b.standardOptimizeOption(.{});
-    std.log.info("\toptimize={}", .{optimize});
-
-    SLANG_VERSION = b.option([]const u8, "version", "The project version, detected using git if available") orelse getVersion();
-    std.log.info("\tversion={s}", .{SLANG_VERSION});
-
-    linkage = b.option(std.builtin.LinkMode, "linkage", "The link mode for the library.") orelse .static;
-    std.log.info("\tlinkage={}", .{linkage});
-
-    // TODO: Remove
-    _install_tools = b.option(bool, "_install_tools", "Whether to install the executables of the tools") orelse false;
-    std.log.info("\t_install_tools={}", .{_install_tools});
-
-    _debug_build_script = b.option(bool, "_debug_build_script", "Debug printouts for the build script") orelse false;
-    std.log.info("\t_debug_build_script={}", .{_debug_build_script});
 }
 
 // Upstream
@@ -177,7 +81,7 @@ fn copyAndPatchUpstream(b: *std.Build) !void {
 
 // Targets
 
-const AddTargetOptions = struct {
+const AddTargetbuild_options = struct {
     type: enum { library, executable },
 
     path: []const u8,
@@ -216,7 +120,7 @@ const AddTargetOptions = struct {
     }
 };
 
-fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions) !*Step.Compile {
+fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetbuild_options) !*Step.Compile {
     dbg("creating step for compiling target {s} \"{s}\"", .{ if (options.type == .executable) "exe" else "lib", name });
 
     const root = upstream.path(b, options.path);
@@ -224,8 +128,8 @@ fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions
 
     // Module
     const mod = b.createModule(.{
-        .target = target,
-        .optimize = optimize,
+        .target = build_options.target,
+        .optimize = build_options.optimize,
         .link_libcpp = true,
         .pic = true,
         .sanitize_c = false,
@@ -254,7 +158,7 @@ fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions
     // Add C++ Sources
     // TODO: Cache build index
     {
-        const allowed_dirs: []const []const u8 = switch (target.result.os.tag) {
+        const allowed_dirs: []const []const u8 = switch (build_options.target.result.os.tag) {
             .windows => &[_][]const u8{ "", "windows" },
             .linux => &[_][]const u8{ "", "unix" },
             else => &[_][]const u8{""},
@@ -304,7 +208,7 @@ fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions
     try mod.c_macros.append(b.allocator, "-DSLANG_ENABLE_IR_BREAK_ALLOC");
     try mod.c_macros.append(b.allocator, "-DSLANG_USE_SYSTEM_SPIRV_HEADER");
 
-    if (optimize == .Debug) try mod.c_macros.append(b.allocator, "-D_DEBUG");
+    if (build_options.optimize == .Debug) try mod.c_macros.append(b.allocator, "-D_DEBUG");
     try mod.c_macros.append(b.allocator, "-DNOMINMAX");
     try mod.c_macros.append(b.allocator, "-DWIN32_LEAN_AND_MEAN");
     try mod.c_macros.append(b.allocator, "-DVC_EXTRALEAN");
@@ -337,7 +241,8 @@ fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions
         const conf = b.addConfigHeader(.{
             .style = .{ .cmake = immutable_upstream.path(b, config_header) },
         }, .{
-            .SLANG_VERSION_FULL = SLANG_VERSION,
+            // TODO: This is not common to all config headers.
+            .SLANG_VERSION_FULL = build_options.slang_version,
         });
 
         mod.addIncludePath(conf.getOutput().dirname());
@@ -355,7 +260,7 @@ fn addTargets(b: *std.Build) !void {
         .path = "source/core",
         .external_dependencies = &.{ .miniz, .unordered_dense, .lz4 },
         .include_directories = &.{ "source", "include" },
-        .linkage = linkage,
+        .linkage = build_options.slang_lib_type,
     });
     b.installArtifact(lib_core);
 
@@ -366,7 +271,7 @@ fn addTargets(b: *std.Build) !void {
         .external_dependencies = &.{ .@"spirv-headers", .unordered_dense },
         .include_directories = &.{ "source", "include" },
         .file_specific_flags = &.{.{ .file = "slang-dxc-compiler.cpp", .flags = &.{"-fms-extensions"} }},
-        .linkage = linkage,
+        .linkage = build_options.slang_lib_type,
     });
     b.installArtifact(lib_compiler_core);
 
@@ -382,7 +287,7 @@ fn addTargets(b: *std.Build) !void {
             "slang-hlsl-prelude.h.cpp",
             "slang-torch-prelude.h.cpp",
         },
-        .linkage = linkage,
+        .linkage = build_options.slang_lib_type,
     });
     lib_prelude.step.dependOn(try runSlangEmbed(b));
     b.installArtifact(lib_prelude);
@@ -394,7 +299,7 @@ fn addTargets(b: *std.Build) !void {
         .external_dependencies = &.{ .miniz, .unordered_dense, .lz4, .@"spirv-headers" },
         .include_directories = &.{ "source", "include", "source/slang/capability", "source/slang/fiddle" },
         .config_headers = &.{"slang-tag-version.h.in"},
-        .linkage = linkage,
+        .linkage = build_options.slang_lib_type,
     });
     lib_slang.step.dependOn(try runSlangFiddle(b));
     lib_slang.step.dependOn(try runSlangCapabilityGenerator(b));
@@ -405,8 +310,8 @@ fn addTargets(b: *std.Build) !void {
 
 // Tools
 
-const RunToolOptions = struct {
-    add_target_options: AddTargetOptions,
+const RunToolbuild_options = struct {
+    add_target_options: AddTargetbuild_options,
     cwd: std.Build.LazyPath,
     run_arguments: []const Run,
 
@@ -417,11 +322,11 @@ const RunToolOptions = struct {
     };
 };
 
-fn runTool(b: *std.Build, comptime name: []const u8, options: RunToolOptions) !*Step {
+fn runTool(b: *std.Build, comptime name: []const u8, options: RunToolbuild_options) !*Step {
     dbg("\tdepending on tool: {s}", .{name}); // Assumes call right after the target was created.
 
     const exe = try addTarget(b, name, options.add_target_options);
-    if (_install_tools) b.installArtifact(exe);
+    b.installArtifact(exe);
 
     var run = b.step("run-" ++ name, "");
     run.* = Step.init(.{
@@ -437,7 +342,7 @@ fn runTool(b: *std.Build, comptime name: []const u8, options: RunToolOptions) !*
 
         try step.argv.appendSlice(b.allocator, run_set.run);
 
-        if (_debug_build_script) {
+        if (build_options.debug_build_script) {
             const echo = b.addSystemCommand(&.{ "echo", "[build] running tool in" });
             echo.addFileArg(options.cwd);
             echo.addArg("\n\t");
@@ -625,8 +530,8 @@ fn spriv_headers(b: *std.Build, mod: *std.Build.Module) void {
 
 fn lz4(b: *std.Build, mod: *std.Build.Module) void {
     const dep = b.dependency("lz4", .{
-        .target = target,
-        .optimize = optimize,
+        .target = build_options.target,
+        .optimize = build_options.optimize,
     });
 
     mod.linkLibrary(dep.artifact("lz4"));
@@ -636,11 +541,11 @@ fn lz4(b: *std.Build, mod: *std.Build.Module) void {
 
 fn lua(b: *std.Build, mod: *std.Build.Module) void {
     const dep = b.dependency("lua", .{
-        .target = target,
-        .release = optimize != .Debug,
+        .target = build_options.target,
+        .release = build_options.optimize != .Debug,
     });
 
-    mod.linkLibrary(dep.artifact(if (target.result.os.tag == .windows) "lua54" else "lua"));
+    mod.linkLibrary(dep.artifact(if (build_options.target.result.os.tag == .windows) "lua54" else "lua"));
 
     dbg("\tlinking with lua", .{});
 }
@@ -662,7 +567,7 @@ fn pathArg(path: std.Build.LazyPath) Arg {
 }
 
 fn dbg(comptime msg: []const u8, args: anytype) void {
-    if (_debug_build_script) std.debug.print("[debug] " ++ msg ++ "\n", args);
+    if (build_options.debug_build_script) std.debug.print("[debug] " ++ msg ++ "\n", args);
 }
 
 // Compilation Flags
