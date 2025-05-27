@@ -127,6 +127,7 @@ fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions
         .optimize = optimize,
         .link_libcpp = true,
         .pic = true,
+        .sanitize_c = false,
     });
 
     // Target
