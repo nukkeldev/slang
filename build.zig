@@ -3,8 +3,6 @@ const std = @import("std");
 const Step = std.Build.Step;
 const Arg = Step.Run.Arg;
 
-const SLANG_VERSION_FULL = "0.0.0";
-
 var target: std.Build.ResolvedTarget = undefined;
 var optimize: std.builtin.OptimizeMode = undefined;
 var immutable_upstream: std.Build.LazyPath = undefined;
@@ -15,10 +13,11 @@ var lib_compiler_core: *Step.Compile = undefined;
 var lib_prelude: *Step.Compile = undefined;
 var lib_slang: *Step.Compile = undefined;
 
+var version: []const u8 = undefined;
 var linkage: std.builtin.LinkMode = undefined;
 
-var install_tools: bool = undefined;
-var debug_build_script: bool = undefined;
+var _install_tools: bool = undefined;
+var _debug_build_script: bool = undefined;
 
 // Build
 
@@ -37,16 +36,26 @@ pub fn build(b: *std.Build) void {
 
 // TODO: Define the rest of the options.
 fn setOptions(b: *std.Build) void {
+    std.log.info("build options", .{});
+
     target = b.standardTargetOptions(.{});
+    std.log.info("\ttarget={}", .{target.result.os.tag});
+
     optimize = b.standardOptimizeOption(.{});
+    std.log.info("\toptimize={}", .{optimize});
 
-    // version = b.option([]const u8, "version", "The project version, detected using git if available") orelse getVersion();
+    version = b.option([]const u8, "version", "The project version, detected using git if available") orelse getVersion();
+    std.log.info("\tversion={s}", .{version});
+
     linkage = b.option(std.builtin.LinkMode, "linkage", "The link mode for the library.") orelse .static;
+    std.log.info("\tlinkage={}", .{linkage});
 
-    install_tools = b.option(bool, "install_tools", "Whether to install the executables of the tools") orelse false;
-    debug_build_script = b.option(bool, "debug_build_script", "Debug printouts for the build script") orelse false;
+    // TODO: Remove
+    _install_tools = b.option(bool, "_install_tools", "Whether to install the executables of the tools") orelse false;
+    std.log.info("\t_install_tools={}", .{_install_tools});
 
-    dbg("options:\n\ttarget[os]={}\n\toptimize={}\n\tlinkage={}\n\tinstall_tools={}", .{ target.result.os.tag, optimize, linkage, install_tools });
+    _debug_build_script = b.option(bool, "_debug_build_script", "Debug printouts for the build script") orelse false;
+    std.log.info("\t_debug_build_script={}", .{_debug_build_script});
 }
 
 // Upstream
@@ -230,7 +239,7 @@ fn addTarget(b: *std.Build, comptime name: []const u8, options: AddTargetOptions
         const conf = b.addConfigHeader(.{
             .style = .{ .cmake = immutable_upstream.path(b, config_header) },
         }, .{
-            .SLANG_VERSION_FULL = SLANG_VERSION_FULL,
+            .SLANG_VERSION_FULL = version,
         });
 
         mod.addIncludePath(conf.getOutput().dirname());
@@ -307,7 +316,7 @@ fn runTool(b: *std.Build, comptime name: []const u8, options: RunToolOptions) !*
     dbg("\tdepending on tool: {s}", .{name}); // Assumes call right after the target was created.
 
     const exe = try addTarget(b, name, options.add_target_options);
-    if (install_tools) b.installArtifact(exe);
+    if (_install_tools) b.installArtifact(exe);
 
     var run = b.step("run-" ++ name, "");
     run.* = Step.init(.{
@@ -323,7 +332,7 @@ fn runTool(b: *std.Build, comptime name: []const u8, options: RunToolOptions) !*
 
         try step.argv.appendSlice(b.allocator, run_set.run);
 
-        if (debug_build_script) {
+        if (_debug_build_script) {
             const echo = b.addSystemCommand(&.{ "echo", "[build] running tool in" });
             echo.addFileArg(options.cwd);
             echo.addArg("\n\t");
@@ -531,6 +540,21 @@ fn lua(b: *std.Build, mod: *std.Build.Module) void {
     dbg("\tlinking with lua", .{});
 }
 
+// Version
+
+fn getVersion() []const u8 {
+    const @"build.zig.zon" = @embedFile("build.zig.zon");
+    var lines = std.mem.splitScalar(u8, @"build.zig.zon", '\n');
+    while (lines.next()) |line| if (std.mem.startsWith(u8, std.mem.trimLeft(u8, line, " \t"), ".version")) {
+        var iter = std.mem.tokenizeScalar(u8, line, ' ');
+        _ = iter.next();
+        _ = iter.next();
+
+        return std.mem.trim(u8, iter.next().?, "\",");
+    };
+    @panic("no .version in build.zig.zon!");
+}
+
 // Misc.
 
 fn strArg(b: *std.Build, str: []const u8) Arg {
@@ -548,7 +572,7 @@ fn pathArg(path: std.Build.LazyPath) Arg {
 }
 
 fn dbg(comptime msg: []const u8, args: anytype) void {
-    if (debug_build_script) std.debug.print("[debug] " ++ msg ++ "\n", args);
+    if (_debug_build_script) std.debug.print("[debug] " ++ msg ++ "\n", args);
 }
 
 // Compilation Flags
