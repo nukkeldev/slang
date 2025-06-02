@@ -1,3 +1,0 @@
-if ! patch --reverse --strip=1 --silent --force --dry-run < "$1" 2>&1 > /dev/null; then
-  patch --strip=1 < "$1"
-fi

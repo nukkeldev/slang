@@ -1,38 +1,12 @@
 .{
     .name = .slang,
-    .version = "2025.10.0",
-    .fingerprint = 0x681d367ce8d10bbd, // Changing this has security and trust implications.
+    .version = "0.0.0",
+    .fingerprint = 0x681d367c6679ce13, // Changing this has security and trust implications.
     .minimum_zig_version = "0.14.1",
-    .dependencies = .{
-        .slang = .{
-            .url = "git+https://github.com/shader-slang/slang?ref=v2025.10#914f8c4b283bd81f2ea3ef00b184ff63245c9278",
-            .hash = "N-V-__8AANf8yQEp5VHgkN6CK5MjlDPuNgxyc94vZQK3_Xq6",
-        },
-        .unordered_dense = .{
-            .url = "git+https://github.com/martinus/unordered_dense?ref=v4.5.0#73f3cbb237e84d483afafc743f1f14ec53e12314",
-            .hash = "N-V-__8AAFdJPQAl6CxKMHf2wXdxBdN-vipngsh6Tg1JLY1I",
-        },
-        .miniz = .{
-            .url = "https://github.com/richgel999/miniz/releases/download/3.0.2/miniz-3.0.2.zip",
-            .hash = "N-V-__8AAEznBgA2IJu6nHlNhEA_PuUhTFkC2d2TkLxuKGfe",
-        },
-        .lz4 = .{
-            .url = "git+https://github.com/allyourcodebase/lz4.git?ref=1.10.0-5#873969ee73aecb3c35203feaf0b5727b9d02b864",
-            .hash = "lz4-1.10.0-5-ewyzw7YNAADOUkQ7M9fjW005oGzxt9b6m0uPd_kQC48z",
-        },
-        .@"spirv-headers" = .{
-            .url = "git+https://github.com/KhronosGroup/SPIRV-Headers#c9aad99f9276817f18f72a4696239237c83cb775",
-            .hash = "N-V-__8AAGiJOgBosX3-HhiyznvMMbKS6wQY6CNfXswKaYpF",
-        },
-        .lua = .{
-            .url = "git+https://github.com/allyourcodebase/lua#5a5a4135cbb8991f27c01bce341fd93134dbecd1",
-            .hash = "lua-5.4.7-zqrcyuUjAAA4YBuZ47elrKT7DSeNx9c3K9XE2YlCoiSz",
-        },
-    },
+    .dependencies = .{},
     .paths = .{
-        "LICENSE",
         "build.zig",
         "build.zig.zon",
-        "src",
+        "LICENSE",
     },
 }
