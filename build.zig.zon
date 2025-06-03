@@ -3,7 +3,28 @@
     .version = "0.0.0",
     .fingerprint = 0x681d367c6679ce13, // Changing this has security and trust implications.
     .minimum_zig_version = "0.14.1",
-    .dependencies = .{},
+    .dependencies = .{
+        .upstream = .{
+            .url = "git+https://github.com/shader-slang/slang?ref=master#359066147c0abc4ca6ad2902cc3a817383d4bd28",
+            .hash = "N-V-__8AACPPzAHDUkFROw3uBZIHARsTbSA7mIa_VcQiZVx-",
+        },
+        .miniz = .{
+            .url = "git+https://github.com/nukkeldev/miniz?ref=3.0.2#2f7ffaae4d7447e24a1b595cc34dc8ca368534db",
+            .hash = "miniz-3.1.0-8ko5WW9SAADH7UT9Ibp2vdlaSxESxVtHMcHfJab_LsKz",
+        },
+        .lua = .{
+            .url = "git+https://github.com/allyourcodebase/lua?ref=main#5a5a4135cbb8991f27c01bce341fd93134dbecd1",
+            .hash = "lua-5.4.7-zqrcyuUjAAA4YBuZ47elrKT7DSeNx9c3K9XE2YlCoiSz",
+        },
+        .lz4 = .{
+            .url = "git+https://github.com/allyourcodebase/lz4.git?ref=1.10.0-5#873969ee73aecb3c35203feaf0b5727b9d02b864",
+            .hash = "lz4-1.10.0-5-ewyzw7YNAADOUkQ7M9fjW005oGzxt9b6m0uPd_kQC48z",
+        },
+        .unordered_dense = .{
+            .url = "git+https://github.com/nukkeldev/unordered_dense?ref=4.5.0#e19734414cff34711ea3e0575f3726602cfd690e",
+            .hash = "unordered_dense-4.5.0-D3sDXIoPAAC9oGLRhBXINHsQQdOllao--fwM1mqUETiu",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",
