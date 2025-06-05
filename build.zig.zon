@@ -21,8 +21,12 @@
             .hash = "lz4-1.10.0-5-ewyzw7YNAADOUkQ7M9fjW005oGzxt9b6m0uPd_kQC48z",
         },
         .unordered_dense = .{
-            .url = "git+https://github.com/nukkeldev/unordered_dense?ref=4.5.0#e19734414cff34711ea3e0575f3726602cfd690e",
-            .hash = "unordered_dense-4.5.0-D3sDXIoPAAC9oGLRhBXINHsQQdOllao--fwM1mqUETiu",
+            .url = "git+https://github.com/nukkeldev/unordered_dense?ref=main#cf753df70a06f0f9d50f8cce5dd0ac471532c746",
+            .hash = "unordered_dense-4.5.0-devel-D3sDXJ4RAAAwnA1yMYcDt-H-pqceEqTHVDQAkYrwH-5y",
+        },
+        .spirv_headers = .{
+            .url = "git+https://github.com/nukkeldev/SPIRV-Headers.git?ref=main#1f5c79a9b5005767c940c8e57f814e7bc14904e0",
+            .hash = "spirv_headers-1.5.5-a720Q1cSAADAcvswkM5WE2r2nwI-QewshAeApT7vDtFv",
         },
     },
     .paths = .{

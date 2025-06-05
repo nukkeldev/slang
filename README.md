@@ -17,12 +17,12 @@ zig fetch --save git+https://github.com/nukkeldev/slang#main
 
 ### Minimum required for `libslang` (Incomplete)
 
-- [ ] Dependencies packaged with Zig
+- [x] Dependencies packaged with Zig
   - [x] `unordered_dense`: nukkeldev
   - [x] `lz4`: AYC
   - [x] `lua`: AYC
   - [x] `miniz`: nukkeldev
-  - [ ] `spirv-headers`: TODO
+  - [x] `SPIRV-headers`: nukkeldev
 - [ ] Package tools
   - [ ] `slang-capability-generator`
   - [ ] `slang-embed`
